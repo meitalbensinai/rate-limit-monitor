@@ -1,0 +1,14 @@
+{
+  "name": "rate-limit-monitor",
+  "owner": { "name": "meital" },
+  "metadata": {
+    "description": "Usage-limit awareness for Claude Code: statusline % + a prompt-submit guard."
+  },
+  "plugins": [
+    {
+      "name": "rate-limit-monitor",
+      "source": "./",
+      "description": "Statusline segment + prompt-submit guard for the 5-hour and 7-day usage limits."
+    }
+  ]
+}

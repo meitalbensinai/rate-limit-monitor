@@ -1,0 +1,6 @@
+# Runtime state written by the statusline (per-machine, not shared)
+.rate-limit-state.json
+
+# OS / editor cruft
+.DS_Store
+*.swp

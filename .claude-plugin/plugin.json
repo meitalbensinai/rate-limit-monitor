@@ -1,0 +1,9 @@
+{
+  "name": "rate-limit-monitor",
+  "displayName": "Rate Limit Monitor",
+  "version": "1.0.0",
+  "description": "Statusline segment + prompt-submit guard for Claude Code's 5-hour and 7-day usage limits. Shows live usage %, and at a configurable threshold it blocks new prompts (with an override) so a long token-heavy task doesn't get cut off mid-run.",
+  "author": { "name": "meital" },
+  "license": "MIT",
+  "keywords": ["rate-limit", "usage", "quota", "statusline", "hooks"]
+}
