@@ -21,6 +21,7 @@ set -euo pipefail
 
 STATE_FILE="${RLM_STATE_FILE:-$HOME/.claude/.rate-limit-state.json}"
 INNER="${RLM_INNER_STATUSLINE:-}"
+THRESHOLD="${RLM_THRESHOLD:-90}"      # matches the guard hook's default
 
 input="$(cat)"
 
@@ -62,14 +63,16 @@ fmt_delta() { # $1=reset_epoch
   fi
 }
 
-# 4. Render a colored segment: green <70, yellow 70-89, red >=90.
+# 4. Render a colored segment, relative to the guard threshold:
+#    red >= threshold (about to be blocked), yellow >= 80% of threshold, green below.
+warn=$(( THRESHOLD * 80 / 100 ))
 seg() { # $1=label $2=pct $3=reset_epoch
   local label="$1" pct="$2" reset="$3" color int
   [ -z "$pct" ] && return
   int="${pct%.*}"
-  if   [ "$int" -ge 90 ]; then color=$'\033[31m'
-  elif [ "$int" -ge 70 ]; then color=$'\033[33m'
-  else                         color=$'\033[32m'
+  if   [ "$int" -ge "$THRESHOLD" ]; then color=$'\033[31m'
+  elif [ "$int" -ge "$warn" ];      then color=$'\033[33m'
+  else                                   color=$'\033[32m'
   fi
   # e.g. "5h 62% (2h14m)" — pct now, resets in delta.
   printf '%s%s %s%%%s (%s)' "$color" "$label" "$int" $'\033[0m' "$(fmt_delta "$reset")"
