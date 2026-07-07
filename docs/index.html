@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rate Limit Monitor — never get cut off mid-task in Claude Code</title>
+<meta name="description" content="A tiny Claude Code plugin that shows your 5-hour and 7-day usage in the statusline and pauses token-heavy tasks near your limit — so you keep tokens for everyday work.">
+<meta property="og:title" content="Rate Limit Monitor for Claude Code">
+<meta property="og:description" content="Pause token-heavy tasks near your usage limit, keep tokens for standard work.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%97%94%3C/text%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#141218; --panel:#1c1922; --panel2:#201c27; --line:#2f2836;
+    --ink:#e9e5ee; --mut:#a49fad; --dim:#736c7c;
+    --pink:#ff7eb6; --pink-deep:#e85fa0; --pink-soft:#ffb3d6;
+    --green:#9ece6a; --yellow:#e0af68; --red:#f7768e;
+    --serif:"Iowan Old Style","Palatino Linotype","Book Antiqua",Palatino,Georgia,serif;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --max:940px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; background:var(--bg); color:var(--ink); font:16.5px/1.7 var(--sans); -webkit-font-smoothing:antialiased}
+  code,pre,.mono{font-family:"SF Mono",ui-monospace,Menlo,Monaco,"Cascadia Code",monospace}
+  a{color:var(--pink); text-decoration:none}
+  a:hover{text-decoration:underline; text-underline-offset:3px}
+  .wrap{max-width:var(--max); margin:0 auto; padding:0 24px}
+  h1,h2,h3,h4{font-family:var(--serif); font-weight:600; letter-spacing:.1px}
+
+  /* nav */
+  nav{position:sticky; top:0; z-index:20; background:rgba(20,18,24,.85); backdrop-filter:blur(8px); border-bottom:1px solid var(--line)}
+  nav .wrap{display:flex; align-items:center; gap:20px; height:62px}
+  .brand{font-family:var(--serif); font-weight:600; font-size:18px; display:flex; align-items:center; gap:9px}
+  .brand .glyph{color:var(--pink)}
+  nav .links{margin-left:auto; display:flex; gap:26px; align-items:center}
+  nav .links a{color:var(--mut); font-size:14.5px; font-family:var(--sans)}
+  nav .links a:hover{color:var(--pink); text-decoration:none}
+
+  .btn{display:inline-flex; align-items:center; gap:8px; padding:11px 20px; border-radius:6px;
+    font:600 15px/1 var(--sans); border:1px solid var(--line); cursor:pointer; background:none; color:var(--ink)}
+  .btn.primary{background:var(--pink); color:#2a0f1e; border-color:var(--pink)}
+  .btn.primary:hover{background:var(--pink-soft); text-decoration:none}
+  .btn.ghost:hover{border-color:var(--pink); color:var(--pink); text-decoration:none}
+
+  /* rule + eyebrow — classic touches */
+  .eyebrow{font-family:var(--sans); color:var(--pink); font-weight:700; font-size:12.5px; letter-spacing:.18em; text-transform:uppercase}
+  .rule{height:1px; background:var(--line); border:0; margin:0}
+
+  /* hero */
+  header.hero{border-bottom:1px solid var(--line)}
+  .hero .wrap{padding:88px 24px 70px; text-align:center}
+  .kicker{display:inline-block; font-family:var(--sans); font-size:13px; color:var(--mut);
+    border:1px solid var(--line); border-radius:999px; padding:5px 14px}
+  h1{font-size:clamp(38px,7vw,64px); line-height:1.08; margin:26px auto 0; max-width:14ch}
+  h1 em{font-style:italic; color:var(--pink)}
+  .sub{font-size:clamp(17px,2.4vw,20px); color:var(--mut); max-width:600px; margin:22px auto 0}
+  .cta{display:flex; justify-content:center; flex-wrap:wrap; gap:14px; margin-top:34px}
+  .chips{display:flex; justify-content:center; flex-wrap:wrap; gap:10px; margin-top:40px}
+  .chip{font:13px/1 "SF Mono",ui-monospace,Menlo,monospace; padding:8px 12px; border-radius:6px; background:var(--panel); border:1px solid var(--line)}
+  .chip b{font-weight:700}
+  .g{color:var(--green)} .y{color:var(--yellow)} .r{color:var(--red)}
+
+  /* sections */
+  section{padding:72px 0; border-bottom:1px solid var(--line)}
+  .head{text-align:center; max-width:640px; margin:0 auto}
+  h2{font-size:clamp(26px,4.4vw,38px); margin:12px 0 0}
+  .lede{color:var(--mut); margin:16px 0 0}
+
+  /* shot */
+  .shot{margin:40px auto 0; max-width:800px; border:1px solid var(--line); border-radius:10px; overflow:hidden; background:#000}
+  .shot img{display:block; width:100%}
+  .shot.small{max-width:700px}
+  .caption{color:var(--dim); font-size:13.5px; text-align:center; margin-top:14px; font-style:italic}
+
+  /* features */
+  .grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:0; margin-top:44px;
+    border:1px solid var(--line); border-radius:10px; overflow:hidden}
+  .card{padding:26px 24px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); background:var(--panel)}
+  .card .ic{font-size:20px}
+  .card h3{margin:12px 0 7px; font-size:19px; color:var(--pink-soft)}
+  .card p{margin:0; color:var(--mut); font-size:14.5px; line-height:1.6}
+
+  /* how */
+  .flow{margin-top:40px; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:22px; overflow-x:auto}
+  .flow pre{margin:0; color:var(--mut); font-size:13px; line-height:1.5}
+  .steps{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:22px; margin-top:34px}
+  .step h4{margin:0 0 6px; font-size:17px; color:var(--pink-soft)}
+  .step .n{font-family:var(--sans); color:var(--pink); font-weight:700; font-size:13px; letter-spacing:.1em}
+  .step p{margin:6px 0 0; color:var(--mut); font-size:14.5px}
+
+  /* install */
+  .codeblock{position:relative; background:#0c0a10; border:1px solid var(--line); border-radius:10px; padding:20px; margin-top:24px}
+  .codeblock pre{margin:0; overflow-x:auto; font-size:13.5px; color:#eae6f0}
+  .codeblock .prmpt{color:var(--dim)}
+  .copy{position:absolute; top:12px; right:12px; font:12px var(--sans); padding:6px 12px; border-radius:6px; border:1px solid var(--line); background:var(--panel); color:var(--mut); cursor:pointer}
+  .copy:hover{color:var(--pink); border-color:var(--pink)}
+  .copy.done{color:var(--green); border-color:var(--green)}
+  .note{color:var(--dim); font-size:13.5px; margin-top:14px}
+
+  .tablewrap{margin-top:26px; border:1px solid var(--line); border-radius:10px; overflow:hidden}
+  table{width:100%; border-collapse:collapse; font-size:14px}
+  th,td{text-align:left; padding:13px 18px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{background:var(--panel); color:var(--mut); font:700 12px var(--sans); letter-spacing:.05em; text-transform:uppercase}
+  tr:last-child td{border-bottom:none}
+  td code{color:var(--pink-soft); font-size:13px}
+  td .def{color:var(--yellow)}
+
+  footer{padding:50px 0; text-align:center; color:var(--dim); font-size:14px}
+  footer a{color:var(--mut)}
+
+  @media (max-width:600px){
+    nav .links a:not(.btn){display:none}
+    .hero .wrap{padding:60px 24px 50px}
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <span class="brand"><span class="glyph">◔</span> Rate Limit Monitor</span>
+    <span class="links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#install">Install</a>
+      <a class="btn ghost" href="https://github.com/meitalbensinai/rate-limit-monitor">GitHub ↗</a>
+    </span>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">◔ A tiny Claude Code plugin · MIT</span>
+    <h1>Never get cut off <em>mid-task.</em></h1>
+    <p class="sub">
+      Rate Limit Monitor puts your Claude Code usage in the statusline and pauses
+      token-heavy tasks as you approach your limit — so you don't burn the last of
+      your window on one big run, and still have tokens for everyday work.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="#install">Quick install</a>
+      <a class="btn ghost" href="https://github.com/meitalbensinai/rate-limit-monitor">View on GitHub ↗</a>
+    </div>
+    <div class="chips" aria-hidden="true">
+      <span class="chip g">◔ 5h <b>62%</b> (2h14m)</span>
+      <span class="chip y">◔ 5h <b>78%</b> (46m)</span>
+      <span class="chip r">◔ 5h <b>93%</b> (38m)</span>
+    </div>
+  </div>
+</header>
+
+<section id="guard">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">The guard</span>
+      <h2>It stops the next heavy prompt — not your session.</h2>
+      <p class="lede">
+        At or above your threshold, the guard holds the new prompt so a long run
+        doesn't drain the rest of your window. Your context is untouched: approve
+        to continue, or wait for the reset.
+      </p>
+    </div>
+    <div class="shot">
+      <img src="img/guard-block.png" alt="The usage guard blocking a prompt at 93%, offering to continue by resubmitting or to wait for reset">
+    </div>
+    <p class="caption">Approve by simply sending the same prompt again — no magic words in your message, and it only asks once per window.</p>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">What you get</span>
+      <h2>Small plugin, real guardrails.</h2>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="ic">📊</div><h3>Live usage statusline</h3><p>Your 5-hour and 7-day windows, with a countdown to reset. Green → yellow → red as you approach the threshold.</p></div>
+      <div class="card"><div class="ic">🛑</div><h3>Prompt guard</h3><p>Near the limit, the next prompt is held before it starts — so a token-heavy task can't eat your whole window.</p></div>
+      <div class="card"><div class="ic">🔁</div><h3>Agentic-loop guard</h3><p>Optional: pauses a long, multi-step model run mid-flight too, not just at submit — then hands control back to you.</p></div>
+      <div class="card"><div class="ic">✅</div><h3>Approve once per window</h3><p>Resubmit the same prompt to continue. No token in your message, and you won't be asked again until the window resets.</p></div>
+      <div class="card"><div class="ic">🎯</div><h3>Real numbers</h3><p>Uses the official <code>rate_limits</code> Claude Code reports — no transcript parsing, no token estimation.</p></div>
+      <div class="card"><div class="ic">🔓</div><h3>Fails open</h3><p>No usage data yet, or an API-key user? It simply allows everything. It never blocks you by mistake.</p></div>
+    </div>
+    <div class="shot small" style="margin-top:44px">
+      <img src="img/statusline-warning.png" alt="Statusline showing the 5-hour window at 93% in red with a reset countdown">
+    </div>
+    <p class="caption">The statusline segment, chaining neatly onto whatever you already run.</p>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">How it works</span>
+      <h2>Two checkpoints, one shared reading.</h2>
+      <p class="lede">
+        Claude Code hands the official rate-limit numbers only to the statusline —
+        hooks never see them. So the statusline writes them to a small state file,
+        and the guards read it.
+      </p>
+    </div>
+    <div class="flow">
+<pre> ┌────────────┐  official rate_limits   ┌───────────────────────────┐
+ │ Claude Code│ ──────────────────────▶ │ statusline: render + write│
+ └────────────┘                         └─────────────┬─────────────┘
+                                                      │  state file
+                        ┌─────────────────────────────┼──────────────┐
+                        ▼                             ▼               ▼
+             UserPromptSubmit guard        PreToolUse loop guard   (self-clears
+             (holds the next prompt)       (pauses a running loop)  after reset)</pre>
+    </div>
+    <div class="steps">
+      <div class="step"><span class="n">STEP 1</span><h4>Watch</h4><p>The statusline shows live usage and persists it every turn.</p></div>
+      <div class="step"><span class="n">STEP 2</span><h4>Hold</h4><p>At/above the threshold, a new prompt (or a running loop) is paused.</p></div>
+      <div class="step"><span class="n">STEP 3</span><h4>Approve</h4><p>Resubmit the same prompt to continue — remembered until the window resets.</p></div>
+      <div class="step"><span class="n">STEP 4</span><h4>Clear</h4><p>Once the reset time passes, the guard steps aside automatically.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <div class="head">
+      <span class="eyebrow">Install</span>
+      <h2>One command, then restart.</h2>
+      <p class="lede">
+        The installer backs up your <code>settings.json</code> and wires the
+        statusline + guards without clobbering anything you already have.
+      </p>
+    </div>
+    <div class="codeblock">
+      <button class="copy" data-copy="git clone https://github.com/meitalbensinai/rate-limit-monitor && bash rate-limit-monitor/install.sh">Copy</button>
+<pre><span class="prmpt">$</span> git clone https://github.com/meitalbensinai/rate-limit-monitor
+<span class="prmpt">$</span> bash rate-limit-monitor/install.sh
+<span class="prmpt">#</span> then restart Claude Code</pre>
+    </div>
+    <p class="note">Undo any time with <code>bash rate-limit-monitor/uninstall.sh</code>. Requires <code>jq</code>, and a Pro / Max / Team / Enterprise plan (that's where Claude Code exposes usage data).</p>
+
+    <h2 style="text-align:center; margin-top:56px; font-size:24px">Tune it with env vars</h2>
+    <div class="tablewrap">
+      <table>
+        <tr><th>Variable</th><th>Default</th><th>What it does</th></tr>
+        <tr><td><code>RLM_THRESHOLD</code></td><td><span class="def">90</span></td><td>Block prompts / deny loop tool calls at or above this percent.</td></tr>
+        <tr><td><code>RLM_GUARD_LOOP</code></td><td><span class="def">1</span></td><td>Also gate the model's agentic loop; set <code>0</code> to disable.</td></tr>
+        <tr><td><code>RLM_OVERRIDE</code></td><td><span class="def">!limit-ok</span></td><td>Legacy phrase that forces a prompt through and approves the window.</td></tr>
+        <tr><td><code>RLM_WINDOWS</code></td><td><span class="def">both</span></td><td>Which windows to guard: <code>5h</code>, <code>7d</code>, or <code>both</code>.</td></tr>
+        <tr><td><code>RLM_INNER_STATUSLINE</code></td><td><span class="def">—</span></td><td>An existing statusline command to render before this one.</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>◔ Rate Limit Monitor — MIT © meital ·
+      <a href="https://github.com/meitalbensinai/rate-limit-monitor">github.com/meitalbensinai/rate-limit-monitor</a></p>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll('.copy').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      navigator.clipboard.writeText(btn.getAttribute('data-copy')).then(function(){
+        var old = btn.textContent;
+        btn.textContent = 'Copied ✓'; btn.classList.add('done');
+        setTimeout(function(){ btn.textContent = old; btn.classList.remove('done'); }, 1600);
+      });
+    });
+  });
+</script>
+</body>
+</html>
