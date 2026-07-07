@@ -33,6 +33,26 @@ You choose:
 
 ---
 
+## Quickstart
+
+Clone it and run the installer — that's the whole thing:
+
+```bash
+git clone https://github.com/meitalbensinai/rate-limit-monitor
+bash rate-limit-monitor/install.sh
+# then restart Claude Code
+```
+
+`install.sh` is safe and idempotent: it backs up `settings.json` and wires the
+statusline + guard **without clobbering** any statusline/hooks you already have.
+Undo any time with `bash rate-limit-monitor/uninstall.sh`.
+
+> **Handing this to an AI coding agent?** Just say *"install this repo."* The
+> agent reads [`AGENTS.md`](AGENTS.md), runs `./install.sh`, and tells you to
+> restart. Nothing else to explain.
+
+---
+
 ## Why two pieces?
 
 Claude Code hands the *official* rate-limit numbers (`rate_limits.five_hour.used_percentage`
@@ -66,21 +86,26 @@ Anthropic.
 
 ## Install
 
-### 1. The guard hook — via the plugin
+### Recommended: the installer
+
+```bash
+bash ./install.sh      # from the cloned repo
+```
+
+It wires both the statusline and the guard, chaining any existing statusline and
+preserving your other hooks. Restart Claude Code afterwards.
+
+### Alternative: the plugin marketplace (guard only) + manual statusline
+
+Prefer Claude Code's native plugin flow? The guard hook can be installed that way:
 
 ```
-/plugin marketplace add <your-github-user>/rate-limit-monitor
+/plugin marketplace add meitalbensinai/rate-limit-monitor
 /plugin install rate-limit-monitor@rate-limit-monitor
 ```
 
-Installing the plugin auto-wires the `UserPromptSubmit` guard. For local
-development you can instead launch Claude Code with
-`--plugin-dir /path/to/rate-limit-monitor`.
-
-### 2. The statusline — one line in your settings
-
-Plugins can't ship a statusline, so add it yourself in `~/.claude/settings.json`.
-To **keep your existing statusline**, chain it via `RLM_INNER_STATUSLINE`:
+Plugins can't ship a statusline, so add that one yourself in
+`~/.claude/settings.json` (chain your existing one via `RLM_INNER_STATUSLINE`):
 
 ```json
 {
@@ -91,10 +116,9 @@ To **keep your existing statusline**, chain it via `RLM_INNER_STATUSLINE`:
 }
 ```
 
-If you don't already have a statusline, drop the `RLM_INNER_STATUSLINE=...` prefix.
-
-> Restart Claude Code after editing settings — statusline and hooks are read at
-> session start.
+Drop the `RLM_INNER_STATUSLINE=...` prefix if you have no existing statusline.
+Don't use *both* routes at once — that wires the guard twice. Restart Claude Code
+after editing settings; statusline and hooks are read at session start.
 
 ## Configuration
 
