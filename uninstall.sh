@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Rate Limit Monitor — uninstaller. Reverses install.sh: removes the guard hook
-# and either restores your original statusline (if we wrapped one) or drops the
-# statusLine entry (if we added it). Idempotent; backs up first.
+# Rate Limit Monitor — uninstaller. Reverses install.sh: removes the
+# UserPromptSubmit guard and the PreToolUse loop guard, and either restores your
+# original statusline (if we wrapped one) or drops the statusLine entry (if we
+# added it). Other hooks are left untouched. Idempotent; backs up first.
 #
 # Usage:  bash ./uninstall.sh
 set -euo pipefail
@@ -30,7 +31,18 @@ jq '
   else . end
 ' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
 
-# 2. Restore / remove statusline.
+# 2. Drop any PreToolUse group whose command references our loop guard.
+tmp="$(mktemp)"
+jq '
+  if .hooks.PreToolUse then
+    .hooks.PreToolUse |= map(select(
+      any(.hooks[]?; (.command // "") | contains("rate-limit-loop-guard.sh")) | not
+    ))
+    | (if (.hooks.PreToolUse | length) == 0 then del(.hooks.PreToolUse) else . end)
+  else . end
+' "$SETTINGS" > "$tmp" && mv "$tmp" "$SETTINGS"
+
+# 3. Restore / remove statusline.
 sl="$(jq -r '.statusLine.command // ""' "$SETTINGS")"
 if printf '%s' "$sl" | grep -q "rate-limit-statusline.sh"; then
   # Was it a wrap of a prior statusline? Recover the inner command if so.
